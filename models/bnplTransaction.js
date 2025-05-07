@@ -28,58 +28,16 @@ const paymentSchema = new mongoose.Schema({
     }
 })
 
-const transcationSchema = new mongoose.Schema({
+const bnplTranscationSchema = new mongoose.Schema({
     property: {
-        type: new mongoose.Schema({
-            name: {
-                type: String,
-                minLength: 5,
-                maxLength: 255,
-            },
-        
-            price: {
-                type: Number,
-                min: 0,
-                max: 999999999
-            },
-        
-            state: {
-                type: String,
-                minLength: 3,
-                maxLength: 50
-            },
-
-            lga: {
-                type: String,
-                minLength: 3,
-                maxLength: 50
-            },
-        
-            status: {
-                type: String,
-                enum: ['available', 'sold', 'bnpl'],
-                default: 'available'
-            }
-        }),
-
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Property',
         required: true
     },
 
     user: {
-        type: new mongoose.Schema({
-            name: {
-                type: String,
-                minLength: 5,
-                maxLength: 50
-            },
-        
-            email: {
-                type: String,
-                minLength: 5,
-                maxLength: 255
-            }
-        }),
-
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
         required: true
     },
 
@@ -88,7 +46,7 @@ const transcationSchema = new mongoose.Schema({
         required: true
     },
 
-    initialDeposit: {
+    upfrontPayment: {
         type: Number,
         required: true
     },
@@ -128,7 +86,7 @@ const transcationSchema = new mongoose.Schema({
     status: {
         type: String,
         enum: ['active', 'completed', 'repossessed', 'resold'],
-        default: active
+        default: 'active'
     },
 
     startDate: {
@@ -147,7 +105,7 @@ const transcationSchema = new mongoose.Schema({
 
 });
 
-const Transaction = mongoose.model('Transaction', transcationSchema);
+const BnplTransaction = mongoose.model('Transaction', bnplTranscationSchema);
 
 function validateTransaction(transaction) {
     const schema = {
@@ -158,5 +116,5 @@ function validateTransaction(transaction) {
     return Joi.validate(transaction, schema)
 }
 
-exports.Transaction = Transaction;
+exports.BnplTransaction = BnplTransaction;
 exports.validate = validateTransaction;

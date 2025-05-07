@@ -6,7 +6,7 @@ const auth = require('./routes/auth');
 const companies = require('./routes/companies');
 const properties = require('./routes/properties');
 const funds = require('./routes/funds');
-const transactions = require('./routes/transactions');
+const transactions = require('./routes/bnplTransactions');
 const app = express()
 
 if (!config.get('jwtPrivateKey')) {
