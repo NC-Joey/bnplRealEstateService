@@ -62,6 +62,11 @@ const bnplTranscationSchema = new mongoose.Schema({
     },
 
     paymentSchedule: [paymentSchema],
+
+    installmentsPaid: {
+        type: Number,
+        default: 0
+    },
     
     missedPayments: {
         type: Number,

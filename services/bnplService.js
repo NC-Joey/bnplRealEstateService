@@ -100,16 +100,18 @@ exports.initiateBnplTransaction = async (userId, propertyId) => {
 
 
 //Process monthly payments
-exports.processMonthlyPayment = async (transactionId, installmentNumber) => {
+exports.processMonthlyPayment = async (transactionId) => {
     const transaction = await BnplTransaction.findById(transactionId);
 
     if (!transaction) {
         throw new Error('Transaction not found');
     }
 
-    if (!transaction.status !== 'active') {
+    if (transaction.status !== 'active') {
         throw new Error('This transaction is no longer active');
     }
+
+    const installmentNumber = transaction.installmentsPaid + 1;
 
     //Find the insatllment
     const installment = transaction.paymentSchedule.find(p => p.installmentNumber === installmentNumber && p.status === 'pending');
@@ -133,8 +135,10 @@ exports.processMonthlyPayment = async (transactionId, installmentNumber) => {
     installment.status = 'paid';
     installment.paidDate = Date.now();
 
+    transaction.installmentsPaid += 1
+
     // Reset consecutive missed payments if any
-    transaction.consecutiveMissedPayments = 0;
+    transaction.missedPayments = 0;
 
     // Update total paid amount
     transaction.totalPaid += installment.amount;
@@ -193,7 +197,7 @@ exports.checkMissedPayments = async() => {
                 }
             }
 
-            transaction.consecutiveMissedPayments = consecutive;
+            transaction.missedPayments = consecutive;
 
             if (consecutive === 2) {
                 //TODO: Send notification
