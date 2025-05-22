@@ -28,7 +28,7 @@ exports.generatePaymentSchedule = (propertyPrice) => {
     }
 
     return {
-        upfrontPayment, balanceLeft, totalPriceWithInterest, monthlyInstallment, paymentSchedule
+        upfrontPayment, totalRemainingWithInterest, totalPriceWithInterest, monthlyInstallment, paymentSchedule
     };
 
 }
@@ -56,13 +56,13 @@ exports.initiateBnplTransaction = async (userId, propertyId) => {
     }
 
     if (property.status != 'available') {
-        throw new Error(`${property.name} which is ${property.status}!!! Property is not available for purchase`)
+        throw new Error("Property is not available for purchase")
     }
 
     //Generate payment schedule
     const {
         upfrontPayment,
-        balanceLeft, paymentSchedule,
+        totalRemainingWithInterest, paymentSchedule,
         totalPriceWithInterest
     } = this.generatePaymentSchedule(property.price);
 
@@ -75,7 +75,7 @@ exports.initiateBnplTransaction = async (userId, propertyId) => {
         property: propertyId,
         totalAmount: totalPriceWithInterest,
         upfrontPayment,
-        balanceLeft,
+        balanceLeft: totalRemainingWithInterest,
         paymentSchedule,
         totalPaid: upfrontPayment,
         percentagePaid: (upfrontPayment / property.price) * 100
@@ -111,10 +111,10 @@ exports.processMonthlyPayment = async (transactionId) => {
         throw new Error('This transaction is no longer active');
     }
 
-    const installmentNumber = transaction.installmentsPaid + 1;
+    const installmentNumber = transaction.installmentsPaid + transaction.missedPayments + 1;
 
     //Find the insatllment
-    const installment = transaction.paymentSchedule.find(p => p.installmentNumber === installmentNumber && p.status === 'pending');
+    const installment = transaction.paymentSchedule.find(p =>p.status === 'pending');
 
     if (!installment) {
         throw new Error('Invalid installment or already paid');
@@ -143,6 +143,9 @@ exports.processMonthlyPayment = async (transactionId) => {
     // Update total paid amount
     transaction.totalPaid += installment.amount;
 
+    //update balance left
+    transaction.balanceLeft -= installment.amount; 
+
     // Calculate percentage paid
     const property = await Property.findById(transaction.property);
     transaction.percentagePaid = (transaction.totalPaid / property.price) * 100;
@@ -153,9 +156,9 @@ exports.processMonthlyPayment = async (transactionId) => {
     }
 
     // Check if all payments are complete
-    const allPaid = transaction.paymentSchedule.every(p => p.status === 'paid');
+    // const allPaid = transaction.paymentSchedule[transaction.paymentSchedule.length - 1].status == "paid"
 
-    if (allPaid) {
+    if (transaction.totalAmount == transaction.totalPaid) {
         transaction.status = 'completed';
         transaction.completionDate = Date.now();
         property.status = 'sold';
@@ -171,8 +174,7 @@ exports.processMonthlyPayment = async (transactionId) => {
 
 //Handle missed payments
 exports.checkMissedPayments = async() => {
-    const today = new Date();
-
+    let today = new Date();
     const activeTransactions = await BnplTransaction.find({status: 'active'})
 
     for (const transaction of activeTransactions) {
@@ -183,6 +185,30 @@ exports.checkMissedPayments = async() => {
             //Mark them as missed
             missedPayments.forEach(payment => {
                 payment.status = 'missed'
+                let lastInstallmentDate = transaction.paymentSchedule[transaction.paymentSchedule.length - 1].dueDate;
+                lastInstallmentDate = moment(lastInstallmentDate);
+                const newInstallmentNumber = transaction.paymentSchedule.length + 1;
+                // const extraMonth = newInstallmentNumber - payment.installmentNumber
+                let newDueDate = lastInstallmentDate.add(1, "months") //add another month from the last installment month
+
+                //add an extra installment to the schedule
+                transaction.paymentSchedule.push({
+                    installmentNumber: newInstallmentNumber,
+                    amount: payment.amount,
+                    dueDate: newDueDate.toDate(),
+                    status: 'pending'
+                })
+
+                //missed payment penalty
+                let penalty = 0.1 * payment.amount;
+                transaction.totalPaid -= penalty //prevent penalty fees from counting toward the total amount paid
+                transaction.balanceLeft += penalty //add penalty to the balnaceLeft
+                let nextInstallmentIndex = payment.installmentNumber;
+                transaction.paymentSchedule[nextInstallmentIndex].amount += penalty //10% penalty on the next installment 
+                //TODO send user notification of the penalty
+                console.log("A 10% penalty fee will be charged to your next installment")
+
+            
             })
 
             //Count consecutive missed payments
@@ -201,13 +227,10 @@ exports.checkMissedPayments = async() => {
 
             if (consecutive === 2) {
                 //TODO: Send notification
+                console.log("Missed payment warning")
             } else if (consecutive >= 3) {
                 //Repossess
                 transaction.status = 'repossessed'
-
-                //Apply 10% penalty
-                const penalty = transaction.totalPaid * 0.1
-                transaction.totalPaid -= penalty;
 
                 const property = await Property.findById(transaction.property);
                 property.status = 'available'

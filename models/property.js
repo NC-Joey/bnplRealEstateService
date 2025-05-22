@@ -57,6 +57,10 @@ const propertySchema = new mongoose.Schema({
         required: true
     },
 
+    currentOwner: {
+        type: String,   
+    }
+
 })
 
 const Property = mongoose.model('Property', propertySchema);

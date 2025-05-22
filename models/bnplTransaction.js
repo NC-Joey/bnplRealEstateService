@@ -114,8 +114,8 @@ const BnplTransaction = mongoose.model('Transaction', bnplTranscationSchema);
 
 function validateTransaction(transaction) {
     const schema = {
-        propertyId: Joi.string().required(),
-        userId: Joi.string().required()
+        userId: Joi.string().required(),
+        propertyId: Joi.string().required()
     }
 
     return Joi.validate(transaction, schema)

@@ -4,17 +4,9 @@ const mongoose = require('mongoose');
 
 const fundSchema = new mongoose.Schema({
     user: {
-        type: new mongoose.Schema({
-            name: {
-                type: String,
-                required: true,
-                minLength: 5,
-                maxLength: 50
-            }
-        }),
-
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
         required: true
-        
     },
 
     amount: {
@@ -35,7 +27,6 @@ const Fund = mongoose.model('Fund', fundSchema);
 
 function validateFund(fund) {
     const schema = {
-        userId: Joi.string().required(),
         amount: Joi.number().required().min(1000000).max(10000000)
     }
 
